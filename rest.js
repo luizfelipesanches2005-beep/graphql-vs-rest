@@ -19,13 +19,28 @@ router.get("/pedidos", (req, res) => {
 });
 //cenario 3
 router.get("/relatorio-financeiro", (req, res) => {
-  const relatorio = pedidos.map(pedido => ({
-    ...pedido,
-    cliente: clientes.find(c => c.id === pedido.clienteId),
-    produto: produtos.find(p => p.id === pedido.produtoId)
-  }));
 
-  res.json(relatorio);
+    const faturamentoTotal = pedidos.reduce(
+        (total, pedido) => total + pedido.valorTotal,
+        0
+    );
+
+    const relatorio = {
+        quantidadePedidos: pedidos.length,
+        faturamentoTotal: faturamentoTotal,
+
+        pedidos: pedidos.map(pedido => ({
+            ...pedido,
+            cliente: clientes.find(
+                c => c.id === pedido.clienteId
+            ),
+            produto: produtos.find(
+                p => p.id === pedido.produtoId
+            )
+        }))
+    };
+
+    res.json(relatorio);
 });
 
 module.exports = router;

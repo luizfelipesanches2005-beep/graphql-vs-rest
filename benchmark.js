@@ -1,42 +1,75 @@
 
 const URL = "http://localhost:3000";
 
-async function testarREST() {
+const cenarios = [
+    {
+        nome: "Listagem de produtos",
+        rotaREST: "/api/produtos",
+        queryGraphQL: "{ produtos { nome preco } }"
+    },
+    {
+        nome: "Relatorio financeiro",
+        rotaREST: "/api/relatorio-financeiro",
+        queryGraphQL: `{
+            relatorioFinanceiro {
+                quantidadePedidos
+                faturamentoTotal
+            }
+        }`
+    },
+    {
+        nome: "Detalhes dos pedidos",
+        rotaREST: "/api/pedidos",
+        queryGraphQL: `{
+            pedidos {
+                id
+                quantidade
+                valorTotal
+                cliente {
+                    nome
+                }
+                produto {
+                    nome
+                }
+            }
+        }`
+    }
+];
+
+async function testarREST(rota) {
     const inicio = performance.now();
 
-    const resposta = await fetch(`${URL}/api/produtos`);
+    const resposta = await fetch(URL + rota);
     const texto = await resposta.text();
 
-    const fim = performance.now();
+    const tempo = performance.now() - inicio;
 
     if (!resposta.ok) {
-        throw new Error(`Erro REST: ${resposta.status}`);
+        throw new Error("Erro REST: " + resposta.status);
     }
 
     return {
         tamanho: Buffer.byteLength(texto, "utf8"),
-        tempo: fim - inicio
+        tempo
     };
 }
 
-async function testarGraphQL() {
+async function testarGraphQL(query) {
     const inicio = performance.now();
 
-    const resposta = await fetch(`${URL}/graphql`, {
+    const resposta = await fetch(URL + "/graphql", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-            query: "{ produtos { nome preco } }"
-        })
+        body: JSON.stringify({ query })
     });
 
     const texto = await resposta.text();
-    const fim = performance.now();
+    const tempo = performance.now() - inicio;
 
     if (!resposta.ok) {
-        throw new Error(`Erro GraphQL: ${resposta.status}`);
+        throw new Error("Erro GraphQL: " + resposta.status);
     }
 
     const dados = JSON.parse(texto);
@@ -47,37 +80,38 @@ async function testarGraphQL() {
 
     return {
         tamanho: Buffer.byteLength(texto, "utf8"),
-        tempo: fim - inicio
+        tempo
     };
 }
 
-async function executar() {
+async function executarCenario(cenario) {
     const repeticoes = 100;
 
     let tempoREST = 0;
     let tempoGraphQL = 0;
+
     let tamanhoREST = 0;
     let tamanhoGraphQL = 0;
 
-    console.log("Iniciando comparação REST x GraphQL");
+    console.log("\nCenario: " + cenario.nome);
 
-    // Aquecimento das duas APIs
+    // Aquecimento das APIs
     for (let i = 0; i < 10; i++) {
-        await testarREST();
-        await testarGraphQL();
+        await testarREST(cenario.rotaREST);
+        await testarGraphQL(cenario.queryGraphQL);
     }
 
+    // Execucao do benchmark
     for (let i = 0; i < repeticoes; i++) {
-        // Alterna a ordem para reduzir viés
         const primeiroREST = i % 2 === 0;
 
         const primeiro = primeiroREST
-            ? await testarREST()
-            : await testarGraphQL();
+            ? await testarREST(cenario.rotaREST)
+            : await testarGraphQL(cenario.queryGraphQL);
 
         const segundo = primeiroREST
-            ? await testarGraphQL()
-            : await testarREST();
+            ? await testarGraphQL(cenario.queryGraphQL)
+            : await testarREST(cenario.rotaREST);
 
         const rest = primeiroREST ? primeiro : segundo;
         const graphql = primeiroREST ? segundo : primeiro;
@@ -96,21 +130,28 @@ async function executar() {
         (1 - tamanhoGraphQL / tamanhoREST) * 100
     );
 
-    console.log("\nRESULTADOS:");
     console.table({
         REST: {
             "Payload (bytes)": tamanhoREST,
-            "Latência média (ms)": mediaREST.toFixed(3)
+            "Latencia media (ms)": mediaREST.toFixed(3)
         },
         GraphQL: {
             "Payload (bytes)": tamanhoGraphQL,
-            "Latência média (ms)": mediaGraphQL.toFixed(3)
+            "Latencia media (ms)": mediaGraphQL.toFixed(3)
         }
     });
 
     console.log(
-        `Redução do payload: ${reducao.toFixed(2)}%`
+        "Reducao do payload: " + reducao.toFixed(2) + "%"
     );
+}
+
+async function executar() {
+    console.log("BENCHMARK REST X GRAPHQL");
+
+    for (const cenario of cenarios) {
+        await executarCenario(cenario);
+    }
 }
 
 executar().catch(console.error);

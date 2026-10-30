@@ -31,10 +31,16 @@ const schema = buildSchema(`
         produto: Produto
     }
 
+    type RelatorioFinanceiro {
+        quantidadePedidos: Int
+        faturamentoTotal: Float
+        pedidos: [Pedido]
+    }
+
     type Query {
         produtos: [Produto]
         pedidos: [Pedido]
-        relatorioFinanceiro: [Pedido]
+        relatorioFinanceiro: RelatorioFinanceiro
     }
 `);
 
@@ -42,8 +48,12 @@ const schema = buildSchema(`
 function buscarPedidosComDetalhes() {
     return pedidos.map(pedido => ({
         ...pedido,
-        cliente: clientes.find(c => c.id === pedido.clienteId),
-        produto: produtos.find(p => p.id === pedido.produtoId)
+        cliente: clientes.find(
+            c => c.id === pedido.clienteId
+        ),
+        produto: produtos.find(
+            p => p.id === pedido.produtoId
+        )
     }));
 }
 
@@ -53,7 +63,18 @@ const root = {
 
     pedidos: () => buscarPedidosComDetalhes(),
 
-    relatorioFinanceiro: () => buscarPedidosComDetalhes()
+    relatorioFinanceiro: () => {
+        const faturamentoTotal = pedidos.reduce(
+            (total, pedido) => total + pedido.valorTotal,
+            0
+        );
+
+        return {
+            quantidadePedidos: pedidos.length,
+            faturamentoTotal: faturamentoTotal,
+            pedidos: buscarPedidosComDetalhes()
+        };
+    }
 };
 
 module.exports = { schema, root };
